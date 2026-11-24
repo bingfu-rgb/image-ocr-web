@@ -33,15 +33,19 @@
     })
       .then(async function (worker) {
         try {
-          await worker.setParameters({ tessedit_pageseg_mode: "3" });
+          await worker.setParameters({
+            tessedit_pageseg_mode: "3",
+            preserve_interword_spaces: "1",
+            user_defined_dpi: "300"
+          });
         } catch (err) {}
         return worker;
       })
       .catch(function (err) {
-      workerPromise = null;
-      workerLang = null;
-      throw err;
-    });
+        workerPromise = null;
+        workerLang = null;
+        throw err;
+      });
     return workerPromise;
   }
 
@@ -75,12 +79,26 @@
     return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   }
 
-  async function recognize(dataUrl, lang, onProgress) {
+  async function prepareSource(dataUrl, enhance, onProgress) {
+    if (!enhance) return dataUrl;
+    if (onProgress) {
+      onProgress({ status: "enhancing image", progress: 0 });
+    }
+    try {
+      return await window.OCRImage.enhanceForOcr(dataUrl);
+    } catch (err) {
+      return dataUrl;
+    }
+  }
+
+  async function recognize(dataUrl, lang, onProgress, options) {
+    const enhance = !options || options.enhance !== false;
+    const source = await prepareSource(dataUrl, enhance, onProgress);
     const worker = await ensureWorker(lang, onProgress);
     if (onProgress) {
       onProgress({ status: "recognizing text", progress: 0 });
     }
-    const response = await worker.recognize(dataUrl);
+    const response = await worker.recognize(source);
     const data = (response && response.data) || {};
     const text = tidyText(data.text);
     const tables = [];
