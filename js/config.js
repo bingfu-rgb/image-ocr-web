@@ -3,6 +3,7 @@
 
   const DEFAULTS = {
     lang: "chi_sim+eng",
+    enhance: true,
     cloudEnabled: false,
     baseUrl: "https://openrouter.ai/api/v1",
     apiKey: "",
