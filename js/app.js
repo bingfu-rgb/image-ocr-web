@@ -12,6 +12,7 @@
     "initializing tesseract": "初始化引擎",
     "loading language traineddata": "下载语言包",
     "initializing api": "准备识别",
+    "enhancing image": "图像增强",
     "recognizing text": "识别中",
     done: "完成"
   };
@@ -55,6 +56,7 @@
       "downloadCsvBtn",
       "settingsDialog",
       "settingsForm",
+      "enhanceEnabled",
       "cloudEnabled",
       "baseUrl",
       "apiKey",
@@ -67,6 +69,9 @@
       "cameraVideo",
       "cameraCancel",
       "shutterBtn",
+      "previewDialog",
+      "previewImage",
+      "previewClose",
       "toast"
     ].forEach(function (id) {
       els[id] = $(id);
@@ -159,6 +164,11 @@
     els.cameraCancel.addEventListener("click", closeCamera);
     els.shutterBtn.addEventListener("click", captureFromCamera);
     els.cameraDialog.addEventListener("close", stopCameraStream);
+
+    els.previewClose.addEventListener("click", closePreview);
+    els.previewDialog.addEventListener("click", function (event) {
+      if (event.target === els.previewDialog) closePreview();
+    });
 
     els.copyBtn.addEventListener("click", copyCurrent);
     els.downloadMdBtn.addEventListener("click", downloadMarkdown);
@@ -265,7 +275,9 @@
 
     if (!result) {
       try {
-        result = await Local.recognize(item.dataUrl, language, reporter);
+        result = await Local.recognize(item.dataUrl, language, reporter, {
+          enhance: settings.enhance !== false
+        });
         if (cloudError) {
           result.note = "云端失败，已改用本地识别";
         }
@@ -300,7 +312,7 @@
     });
 
     if (state.activeId === item.id) {
-      showResult(result, item.name);
+      showResult(result, item.name, item.dataUrl);
     }
 
     if (cloudError) {
@@ -381,7 +393,7 @@
     });
     if (!item) return;
     if (item.status === "done" && item.result) {
-      showResult(item.result, item.name);
+      showResult(item.result, item.name, item.dataUrl);
     } else if (item.status === "error") {
       showResult({ error: item.error, mode: "local", name: item.name });
     } else {
@@ -399,6 +411,16 @@
     }
     const row = event.target.closest(".queue-item");
     if (!row) return;
+    const thumb = event.target.closest(".q-thumb");
+    if (thumb) {
+      const item = state.queue.find(function (entry) {
+        return entry.id === row.dataset.id;
+      });
+      if (item && item.dataUrl) {
+        openPreview(item.dataUrl);
+        return;
+      }
+    }
     selectItem(row.dataset.id);
   }
 
@@ -427,7 +449,7 @@
       });
       if (next) {
         state.activeId = next.id;
-        showResult(next.result, next.name);
+        showResult(next.result, next.name, next.dataUrl);
       } else {
         renderView();
       }
@@ -447,14 +469,15 @@
     renderView();
   }
 
-  function showResult(result, name) {
+  function showResult(result, name, preview) {
     state.view = {
       text: result.text || "",
       tables: Array.isArray(result.tables) ? result.tables : [],
       mode: result.mode || "local",
       name: name || "",
       note: result.note || "",
-      error: result.error || ""
+      error: result.error || "",
+      preview: preview || ""
     };
     renderView();
   }
@@ -498,6 +521,21 @@
     if (view.note) pieces.push(view.note);
     meta.textContent = pieces.join(" · ");
     els.resultBody.appendChild(meta);
+
+    if (view.preview) {
+      const previewBtn = document.createElement("button");
+      previewBtn.type = "button";
+      previewBtn.className = "result-preview";
+      previewBtn.title = "点击查看大图";
+      const previewImg = document.createElement("img");
+      previewImg.src = view.preview;
+      previewImg.alt = "原图预览";
+      previewBtn.appendChild(previewImg);
+      previewBtn.addEventListener("click", function () {
+        openPreview(view.preview);
+      });
+      els.resultBody.appendChild(previewBtn);
+    }
 
     if (hasText) {
       const text = document.createElement("div");
@@ -650,6 +688,7 @@
   }
 
   function openSettings() {
+    els.enhanceEnabled.checked = settings.enhance !== false;
     els.cloudEnabled.checked = Boolean(settings.cloudEnabled);
     els.baseUrl.value = settings.baseUrl || Config.DEFAULTS.baseUrl;
     els.apiKey.value = settings.apiKey || "";
@@ -663,6 +702,7 @@
     event.preventDefault();
     settings = Config.save({
       lang: settings.lang,
+      enhance: els.enhanceEnabled.checked,
       cloudEnabled: els.cloudEnabled.checked,
       baseUrl: els.baseUrl.value.trim(),
       apiKey: els.apiKey.value.trim(),
@@ -729,6 +769,17 @@
   function closeCamera() {
     stopCameraStream();
     if (els.cameraDialog.open) els.cameraDialog.close();
+  }
+
+  function openPreview(url) {
+    if (!url) return;
+    els.previewImage.src = url;
+    if (!els.previewDialog.open) els.previewDialog.showModal();
+  }
+
+  function closePreview() {
+    if (els.previewDialog.open) els.previewDialog.close();
+    els.previewImage.removeAttribute("src");
   }
 
   function stopCameraStream() {
@@ -815,7 +866,8 @@
       mode: record.mode || "local",
       name: record.name || formatDateTime(record.time),
       note: "来自历史记录",
-      error: ""
+      error: "",
+      preview: record.thumb || ""
     };
     renderView();
     els.historyDialog.close();
