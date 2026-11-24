@@ -78,6 +78,13 @@
       <div class="dialog-body">
         <label class="switch-row">
           <span>
+            <strong>图像增强</strong>
+            <small>灰度 + 二值化预处理，明显提升文档识别率</small>
+          </span>
+          <input id="enhanceEnabled" type="checkbox" />
+        </label>
+        <label class="switch-row">
+          <span>
             <strong>启用云端增强</strong>
             <small>用视觉大模型识别，表格结构更准确</small>
           </span>
@@ -129,6 +136,13 @@
         <button id="cameraCancel" class="ghost" type="button">取消</button>
         <button id="shutterBtn" class="shutter" type="button" aria-label="拍照"></button>
       </div>
+    </div>
+  </dialog>
+
+  <dialog id="previewDialog" class="preview-dialog">
+    <div class="preview-wrap">
+      <img id="previewImage" alt="图片预览" />
+      <button id="previewClose" class="preview-close" type="button" aria-label="关闭">✕</button>
     </div>
   </dialog>
 
